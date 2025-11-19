@@ -10,5 +10,7 @@ import java.util.List;
 public interface PageRepository extends JpaRepository<Page, Long> {
     List<Page> findBySiteId(Long siteId);
 
+    List<Page> findByPathAndSiteId(String path, long siteId);
+
     void deleteAllBySiteId(Long siteId);
 }
