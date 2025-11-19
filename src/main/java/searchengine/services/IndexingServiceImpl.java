@@ -1,6 +1,8 @@
 package searchengine.services;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
@@ -21,12 +23,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 @Service
 @RequiredArgsConstructor
 public class IndexingServiceImpl implements IndexingService {
 
+    @Getter
+    @Setter
+    private AtomicBoolean indexingInProgress = new AtomicBoolean(false);
     private static final Logger logger = Logger.getLogger(IndexingServiceImpl.class.getName());
     private final SitesList sitesList;
     private final SiteRepository siteRepository;
@@ -35,6 +41,9 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public IndexingResponse startIndexing() {
+        if (indexingInProgress.get()) {
+            return new IndexingResponse(false, "Indexing is already in progress");
+        }
         List<Site> sites = sitesList.getSites();
         Set<String> visited = ConcurrentHashMap.newKeySet();
         ExecutorService executor = Executors.newFixedThreadPool(sites.size());
@@ -51,12 +60,13 @@ public class IndexingServiceImpl implements IndexingService {
             } catch (Exception e) {
                 updateSiteStatus(site, Status.FAILED);
                 logger.info("Error indexing site: " + site.getUrl() + " " + e.getMessage());
+                return new IndexingResponse(false, e.getMessage());
             } finally {
                 updateSiteStatus(site, Status.INDEXED);
             }
 
         }
-        return null;
+        return new IndexingResponse(true, "Indexing completed successfully");
     }
 
     private void crawlSite(Site site, Set<String> visited, ForkJoinPool pool) throws URISyntaxException {
